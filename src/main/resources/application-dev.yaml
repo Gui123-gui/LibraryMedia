@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/librarymedia?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:librarymedia}
+    password: ${DB_PASSWORD}
+
+app:
+  security:
+    jwt:
+      secret: ${JWT_SECRET}
+  media:
+    tmdb:
+      api-key: ${TMDB_API_KEY}
+    open-library:
+      user-agent: ${OPEN_LIBRARY_USER_AGENT:PersonalMediaLibrary/1.0}
+
+logging:
+  level:
+    com.guilhermedev.librarymedia: DEBUG

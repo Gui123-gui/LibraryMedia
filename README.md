@@ -4,7 +4,7 @@ Biblioteca pessoal de livros, filmes e séries. O projeto será desenvolvido com
 
 ## Tecnologias
 
-- Backend: Java 21, Spring Boot, Spring Data JPA, Spring Security, MySQL e Flyway.
+- Backend: Java 21, Spring Boot 3.5.x, Spring Data JPA, Spring Security, MySQL e Flyway.
 - Frontend: React, TypeScript e Vite.
 - API: REST em `/api/v1`, documentada com OpenAPI/Swagger.
 - Desenvolvimento: Docker Compose.
@@ -40,32 +40,40 @@ O diretório `frontend` contém a aplicação React + TypeScript. A configuraç�
 
 ## Executar com Docker Compose
 
-Defina `DB_PASSWORD` e `MYSQL_ROOT_PASSWORD` no ambiente do PowerShell e execute:
+O Spring Initializr atualmente lista versões 4.x do Spring Boot. Este projeto segue a decisão de aprendizado de usar a linha 3.5.x; as versões publicadas podem ser conferidas no Maven Central. O parent do Spring Boot gerencia versões compatíveis das dependências Spring.
+
+Copie `.env.example` para `.env`, substitua todos os valores de exemplo e execute:
 
 ```powershell
-$env:DB_PASSWORD = "uma-senha-local"
-$env:MYSQL_ROOT_PASSWORD = "outra-senha-local"
+Copy-Item .env.example .env
+# Edite o arquivo .env e substitua os valores de exemplo antes de continuar.
 docker compose up --build
 ```
 
 - Frontend: `http://localhost:3000`
 - API: `http://localhost:8080`
+- Verificação de saúde: `http://localhost:8080/actuator/health`
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
 
 O MySQL usa o volume `mysql_data`. Para preservar os dados locais, não remova esse volume.
+O arquivo `.env` contém configurações locais e é ignorado pelo Git. Nunca coloque credenciais reais em `.env.example`.
 
 ## Executar localmente
 
-Inicie um MySQL 8.4, configure `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` e rode o backend:
+Inicie um MySQL 8.4, copie `.env.example` para `.env` e configure as variáveis no ambiente do PowerShell:
 
 ```powershell
+Copy-Item .env.example .env
+# Edite .env e substitua os valores de exemplo.
 $env:DB_URL = "jdbc:mysql://localhost:3306/librarymedia?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
 $env:DB_USERNAME = "librarymedia"
-$env:DB_PASSWORD = "uma-senha-local"
+$env:DB_PASSWORD = "a-mesma-senha-local-do-arquivo-env"
+$env:JWT_SECRET = "a-mesma-chave-local-do-arquivo-env"
+$env:TMDB_API_KEY = "sua-chave-tmdb"
 .\mvnw.cmd spring-boot:run
 ```
 
-Flyway cria o schema no início da aplicação. H2 está disponível somente para testes.
+O perfil `dev` é ativado por padrão. Flyway cria o schema no início da aplicação. O endpoint `/actuator/health` é público para verificações; as outras rotas exigem autenticação. H2 está disponível somente para testes.
 
 Para o frontend, instale uma versão LTS do Node.js e execute:
 
@@ -84,3 +92,51 @@ Na raiz do projeto:
 ```powershell
 .\mvnw.cmd test
 ```
+
+Os testes padrão usam H2 e provedores simulados; um teste WireMock cobre a integração HTTP com o Open Library.
+Há também um teste opcional de validação das migrations e mapeamentos Hibernate no MySQL 8.4 via Testcontainers.
+Ele é automaticamente ignorado quando Docker não está disponível, então a suíte padrão não depende de Docker.
+
+## API implementada
+
+A API usa JWT. Cadastre-se em `POST /api/v1/auth/register` (incluindo `passwordConfirmation`) e entre
+em `POST /api/v1/auth/login`; o cadastro retorna apenas `id`, `name` e `email`, enquanto o login retorna
+`accessToken`, `tokenType` e `expiresIn`. Envie esse token no cabeçalho HTTP Authorization, usando o esquema de autenticação JWT.
+O cadastro cria automaticamente a lista imutável `Favorites`. `GET /api/v1/users/me` retorna somente id, nome e e-mail.
+Rotas disponíveis:
+
+| Área | Rotas |
+|---|---|
+| Mídia | `GET /api/v1/media/search?q=...&page=0&size=20&type=BOOK&year=...&genre=...&minRating=...`, `GET /api/v1/media/suggestions?q=...`, `GET /api/v1/media/{provider}/{externalId}?type=...` |
+| Listas | `GET/POST /api/v1/lists`, `GET/PATCH/DELETE /api/v1/lists/{listId}`, `GET/POST /api/v1/lists/{listId}/items`, `DELETE /api/v1/lists/{listId}/items/{entryId}` |
+| Biblioteca | `GET/POST /api/v1/library`, `GET/DELETE /api/v1/library/{entryId}`, `PUT /api/v1/library/{entryId}/status`, `PUT /api/v1/library/{entryId}/rating` |
+| Rankings | `GET /api/v1/rankings/books`, `/movies` ou `/series` |
+| Compartilhamento | `GET/PUT /api/v1/lists/{listId}/share`, `GET /api/v1/public/lists/{token}` |
+
+Paginação começa em zero e retorna `content`, `page`, `size`, `totalElements` e `totalPages`.
+Tamanho padrão: 20 (máximo 50; buscas externas têm máximo 20). A biblioteca aceita filtros `type`,
+`status`, `listId`, `q` e `sort`; adições exigem ao menos um `listId` explícito. Erros seguem Problem Details
+e incluem `code`; conflitos que exigem confirmação usam HTTP 409 e query parameter `confirm=true`.
+Listas e entradas são sempre filtradas pelo usuário autenticado; recursos de outra pessoa retornam
+404. Remover a última associação de uma obra ou apagar uma lista com obras exclusivas pede
+confirmação. Uma avaliação de 1 a 10 só pode ser criada/alterada enquanto o status é `DONE`, mas é
+preservada quando o status muda.
+
+Busca consulta TMDB (filmes e séries) e Open Library (livros), não grava resultados até serem
+adicionados à biblioteca, usa cache Caffeine em memória limitado e com expiração para respostas externas e continua com o provedor
+disponível se o outro falhar. Busca unificada interleave os resultados; filtro de gênero e nota é
+aplicado localmente na página retornada. Open Library recebe o User-Agent configurável
+`OPEN_LIBRARY_USER_AGENT`. TMDB requer `TMDB_API_KEY`.
+
+O endpoint `GET /api/v1/media/attribution` fornece o texto e link de atribuição do TMDB. Configure
+`APP_FRONTEND_BASE_URL` para definir a origem usada nas URLs de compartilhamento. A interface
+que consumir a API deve exibir: “This product uses the TMDB API but is not endorsed or certified by
+TMDB.” Consulte também [os requisitos de atribuição do TMDB](https://developer.themoviedb.org/docs/faq).
+
+Swagger UI: `http://localhost:8080/swagger-ui.html`; OpenAPI JSON: `/v3/api-docs`.
+
+## Chaves de serviços externos
+
+Copie `.env.example` para `.env` e substitua os valores fictícios. A chave JWT deve ter pelo menos
+32 bytes aleatórios. Não compartilhe nem versiona o `.env`. Os testes usam H2 e provedores simulados,
+sem chaves reais ou chamadas de rede.

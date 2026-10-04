@@ -22,6 +22,11 @@ services:
       DB_URL: jdbc:mysql://mysql:3306/librarymedia?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       DB_USERNAME: ${DB_USERNAME:-librarymedia}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the environment}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the environment}
+      TMDB_API_KEY: ${TMDB_API_KEY:?Set TMDB_API_KEY in the environment}
+      OPEN_LIBRARY_USER_AGENT: ${OPEN_LIBRARY_USER_AGENT:-PersonalMediaLibrary/1.0}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:*,http://localhost:3000}
+      SPRING_PROFILES_ACTIVE: dev
     ports:
       - "8080:8080"
     depends_on:

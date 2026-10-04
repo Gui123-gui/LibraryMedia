@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    active: test
   datasource:
     url: jdbc:h2:mem:librarymedia-test;MODE=MySQL;DB_CLOSE_DELAY=-1
     driver-class-name: org.h2.Driver
@@ -6,7 +8,14 @@ spring:
     password:
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: create-drop
     open-in-view: false
   flyway:
     enabled: false
+app:
+  security:
+    jwt:
+      secret: test-only-signing-key-with-at-least-32-bytes
+  media:
+    tmdb:
+      api-key: test-api-key
