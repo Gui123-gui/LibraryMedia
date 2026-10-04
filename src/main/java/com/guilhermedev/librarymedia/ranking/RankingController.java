@@ -48,9 +48,10 @@ public class RankingController {
                 .mapToObj(index -> {
                     UserMedia entry = entries.getContent().get(index);
                     int position = (int) (entries.getNumber() * (long) entries.getSize()) + index + 1;
-                    return new RankingEntry(position, entry.getId(), entry.getMedia().getTitle(),
-                            entry.getMedia().getType().name(), entry.getMedia().getReleaseYear(),
-                            entry.getMedia().getCoverUrl(), entry.getRating());
+                    return new RankingEntry(position, entry.getId(),
+                            new RankingMedia(entry.getMedia().getType().name(), entry.getMedia().getTitle(),
+                                    entry.getMedia().getReleaseYear(), entry.getMedia().getCoverUrl()),
+                            entry.getRating());
                 })
                 .toList();
         return new PageResponse<>(ranked, entries.getNumber(), entries.getSize(),
@@ -67,6 +68,6 @@ public class RankingController {
         };
     }
 
-    public record RankingEntry(int rank, Long entryId, String title, String type, Integer releaseYear,
-                               String coverUrl, Integer rating) { }
+    public record RankingEntry(int position, Long entryId, RankingMedia media, Integer rating) { }
+    public record RankingMedia(String type, String title, Integer year, String coverUrl) { }
 }

@@ -104,8 +104,8 @@ public class ListController {
                               "affectedMediaCount": 2
                             }
                             """)))
-    public DeleteListResponse deleteList(@PathVariable Long listId,
-                                         @RequestParam(defaultValue = "false") boolean confirm) {
+    public ResponseEntity<Void> deleteList(@PathVariable Long listId,
+                                           @RequestParam(defaultValue = "false") boolean confirm) {
         MediaList list = ownedListForUpdate(listId, CurrentUser.id());
         if (list.isFavorites()) {
             throw new ApiException(HttpStatus.CONFLICT, "FAVORITES_LIST_PROTECTED",
@@ -124,7 +124,7 @@ public class ListController {
             userMediaRepository.deleteById(entryId);
         }
         listRepository.delete(list);
-        return new DeleteListResponse(true, exclusiveEntries.size());
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{listId}/items")
@@ -225,9 +225,8 @@ public class ListController {
     public record CreateListRequest(@NotBlank @Size(max = 100) String name) { }
     public record RenameListRequest(@NotBlank @Size(max = 100) String name) { }
     public record AddItemRequest(@NotNull Long entryId) { }
-    public record ListSummary(Long id, String name, boolean favorites, long itemCount,
-                              List<String> coverUrls, boolean shared) { }
-    public record DeleteListResponse(boolean deleted, int removedLibraryEntries) { }
+    public record ListSummary(Long id, String name, boolean favorites, long mediaCount,
+                              List<String> covers, boolean shared) { }
     public record AddItemResponse(Long entryId, boolean alreadyInList) { }
     public record RemoveItemResponse(Long entryId, boolean removedFromLibrary) { }
     public record ListItemsResponse(List<ListItemView> content, int page, int size, long totalElements,

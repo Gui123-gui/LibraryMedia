@@ -62,7 +62,7 @@ public class AuthController {
             throw new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED",
                     "Email is already registered");
         }
-        listRepository.save(new MediaList(user, "Favorites", true));
+        listRepository.save(new MediaList(user, "Favoritos", true));
         return new RegisterResponse(user.getId(), user.getName(), user.getEmail());
     }
 

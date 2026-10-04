@@ -168,8 +168,8 @@ public class LibraryController {
 
     @DeleteMapping("/{entryId}")
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    public DeleteLibraryResponse removeFromLibrary(@PathVariable Long entryId,
-                                                    @RequestParam(defaultValue = "false") boolean confirm) {
+    public ResponseEntity<Void> removeFromLibrary(@PathVariable Long entryId,
+                                                   @RequestParam(defaultValue = "false") boolean confirm) {
         UserMedia existing = ownedEntry(entryId);
         List<ListItem> memberships = itemRepository.findAllByUserMediaId(existing.getId());
         if (memberships.stream().anyMatch(item ->
@@ -188,7 +188,7 @@ public class LibraryController {
         }
         itemRepository.deleteAllByUserMediaId(entry.getId());
         userMediaRepository.delete(entry);
-        return new DeleteLibraryResponse(entryId, true);
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{entryId}/status")
@@ -299,7 +299,6 @@ public class LibraryController {
                                 @jakarta.validation.constraints.Max(10) Integer rating) { }
     public record AddToLibraryResponse(Long entryId, boolean alreadyInLibrary, List<Long> addedToLists,
                                        List<Long> alreadyInLists, String status, Integer rating) { }
-    public record DeleteLibraryResponse(Long entryId, boolean removed) { }
     public record ListReference(Long id, String name) { }
     public record LibraryEntryView(Long entryId, Long mediaId, String provider, String externalId, String type,
                                    String title, Integer releaseYear, String genre, String synopsis, String coverUrl,

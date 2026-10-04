@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
@@ -136,7 +137,7 @@ class LibrarymediaApplicationTests {
 	}
 
 	@Test
-	void registrationCreatesFavoritesAndMeDoesNotExposePassword() throws Exception {
+	void cenario1_cadastroValidoCriaFavoritos() throws Exception {
 		ResponseEntity<JsonNode> registration = register();
 		assertEquals(HttpStatus.CREATED, registration.getStatusCode());
 
@@ -152,8 +153,12 @@ class LibrarymediaApplicationTests {
 		ResponseEntity<JsonNode> lists = restTemplate.exchange("/api/v1/lists", HttpMethod.GET,
 				authenticated(token), JsonNode.class);
 		assertEquals(1, lists.getBody().size());
-		assertEquals("Favorites", lists.getBody().get(0).path("name").asText());
+		assertEquals("Favoritos", lists.getBody().get(0).path("name").asText());
 		assertTrue(lists.getBody().get(0).path("favorites").asBoolean());
+		assertEquals(0, lists.getBody().get(0).path("mediaCount").asInt());
+		assertTrue(lists.getBody().get(0).path("covers").isArray());
+		assertFalse(lists.getBody().get(0).has("itemCount"));
+		assertFalse(lists.getBody().get(0).has("coverUrls"));
 	}
 
 	@Test
@@ -353,14 +358,38 @@ class LibrarymediaApplicationTests {
 		assertEquals(HttpStatus.CONFLICT, firstDelete.getStatusCode());
 		assertTrue(firstDelete.getBody().contains("LIST_HAS_EXCLUSIVE_MEDIA"));
 
-		ResponseEntity<JsonNode> confirmedDelete = restTemplate.exchange("/api/v1/lists/" + listId +
+		ResponseEntity<String> confirmedDelete = restTemplate.exchange("/api/v1/lists/" + listId +
 						"?confirm=true", HttpMethod.DELETE,
-				authenticated(token), JsonNode.class);
-		assertEquals(HttpStatus.OK, confirmedDelete.getStatusCode());
-		assertEquals(1, confirmedDelete.getBody().path("removedLibraryEntries").asInt());
+				authenticated(token), String.class);
+		assertEquals(HttpStatus.NO_CONTENT, confirmedDelete.getStatusCode());
+		assertNull(confirmedDelete.getBody());
 		ResponseEntity<String> removedEntry = restTemplate.exchange("/api/v1/library/" + entryId,
 				HttpMethod.GET, authenticated(token), String.class);
 		assertEquals(HttpStatus.NOT_FOUND, removedEntry.getStatusCode());
+	}
+
+	@Test
+	void deletingLibraryEntryRequiresConfirmationAndReturnsNoContent() throws Exception {
+		String token = registerAndLogin();
+		long listId = getFavoritesId(token);
+		ResponseEntity<JsonNode> added = restTemplate.exchange("/api/v1/library", HttpMethod.POST,
+				jsonRequest(token, "{\"provider\":\"tmdb\",\"externalId\":\"movie-1\",\"listIds\":[" +
+						listId + "],\"consumed\":true,\"rating\":8}"), JsonNode.class);
+		long entryId = added.getBody().path("entryId").asLong();
+
+		ResponseEntity<String> unconfirmed = restTemplate.exchange("/api/v1/library/" + entryId,
+				HttpMethod.DELETE, authenticated(token), String.class);
+		assertEquals(HttpStatus.CONFLICT, unconfirmed.getStatusCode());
+		assertTrue(unconfirmed.getBody().contains("LIBRARY_REMOVAL_CONFIRMATION_REQUIRED"));
+		assertEquals(HttpStatus.OK, restTemplate.exchange("/api/v1/library/" + entryId,
+				HttpMethod.GET, authenticated(token), String.class).getStatusCode());
+
+		ResponseEntity<String> confirmed = restTemplate.exchange("/api/v1/library/" + entryId + "?confirm=true",
+				HttpMethod.DELETE, authenticated(token), String.class);
+		assertEquals(HttpStatus.NO_CONTENT, confirmed.getStatusCode());
+		assertNull(confirmed.getBody());
+		assertEquals(HttpStatus.NOT_FOUND, restTemplate.exchange("/api/v1/library/" + entryId,
+				HttpMethod.GET, authenticated(token), String.class).getStatusCode());
 	}
 
 	@Test
@@ -425,13 +454,14 @@ class LibrarymediaApplicationTests {
 		ResponseEntity<JsonNode> firstPage = restTemplate.exchange("/api/v1/rankings/movies?page=0&size=2",
 				HttpMethod.GET, authenticated(token), JsonNode.class);
 		assertEquals(3, firstPage.getBody().path("totalElements").asInt());
-		assertEquals(1, firstPage.getBody().path("content").get(0).path("rank").asInt());
-		assertEquals("A Test Movie", firstPage.getBody().path("content").get(0).path("title").asText());
-		assertEquals(2, firstPage.getBody().path("content").get(1).path("rank").asInt());
+		assertEquals(1, firstPage.getBody().path("content").get(0).path("position").asInt());
+		assertEquals("A Test Movie", firstPage.getBody().path("content").get(0).path("media").path("title").asText());
+		assertFalse(firstPage.getBody().path("content").get(0).has("rank"));
+		assertEquals(2, firstPage.getBody().path("content").get(1).path("position").asInt());
 
 		ResponseEntity<JsonNode> secondPage = restTemplate.exchange("/api/v1/rankings/movies?page=1&size=2",
 				HttpMethod.GET, authenticated(token), JsonNode.class);
-		assertEquals(3, secondPage.getBody().path("content").get(0).path("rank").asInt());
+		assertEquals(3, secondPage.getBody().path("content").get(0).path("position").asInt());
 
 		ResponseEntity<String> invalidCategory = restTemplate.exchange("/api/v1/rankings/music",
 				HttpMethod.GET, authenticated(token), String.class);
@@ -455,8 +485,9 @@ class LibrarymediaApplicationTests {
 		ResponseEntity<JsonNode> activated = restTemplate.exchange("/api/v1/lists/" + listId + "/share",
 				HttpMethod.PUT, jsonRequest(token, "{\"active\":true}"), JsonNode.class);
 		String shareToken = activated.getBody().path("token").asText();
-		assertTrue(activated.getBody().path("active").asBoolean());
+		assertTrue(activated.getBody().path("shared").asBoolean());
 		assertTrue(activated.getBody().path("url").asText().contains(shareToken));
+		assertFalse(activated.getBody().has("active"));
 
 		ResponseEntity<JsonNode> publicList = restTemplate.getForEntity(
 				"/api/v1/public/lists/" + shareToken + "?page=0&size=1", JsonNode.class);
@@ -470,6 +501,9 @@ class LibrarymediaApplicationTests {
 		assertFalse(publicItem.has("status"));
 		assertFalse(publicItem.has("id"));
 		assertFalse(publicItem.has("provider"));
+		assertFalse(publicItem.has("externalRating"));
+		assertFalse(publicItem.has("releaseYear"));
+		assertEquals(2024, publicItem.path("year").asInt());
 		assertFalse(publicList.getBody().has("owner"));
 
 		restTemplate.exchange("/api/v1/lists/" + listId + "/share", HttpMethod.PUT,

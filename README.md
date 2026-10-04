@@ -52,11 +52,14 @@ docker compose up --build
 
 - Frontend: `http://localhost:3000`
 - API: `http://localhost:8080`
+- MySQL: `localhost:${MYSQL_PORT}` (default `3306`)
 - Verificação de saúde: `http://localhost:8080/actuator/health`
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
 
+Se a porta local `3306` já estiver ocupada por outro MySQL, altere `MYSQL_PORT` no `.env` (por exemplo, para `3307`); a API continua usando o MySQL interno do Compose.
 O MySQL usa o volume `mysql_data`. Para preservar os dados locais, não remova esse volume.
 O arquivo `.env` contém configurações locais e é ignorado pelo Git. Nunca coloque credenciais reais em `.env.example`.
+`TMDB_API_KEY` deve conter a chave de API **v3** do TMDB, não o Read Access Token v4.
 
 ## Executar localmente
 
@@ -84,6 +87,10 @@ npm run dev
 ```
 
 O servidor Vite fica em `http://localhost:5173` e encaminha `/api` para `http://localhost:8080`.
+No Compose, `APP_FRONTEND_BASE_URL` usa `http://localhost:3000` por padrão para que links
+compartilhados apontem para o Nginx; ajuste a variável quando publicar o frontend em outra origem.
+Com a API em execução, atualize os tipos estáticos do contrato com `npm run generate:api-types`
+no diretório `frontend`; o arquivo gerado fica em `frontend/src/generated/api-schema.d.ts`.
 
 ## Testes do backend
 
@@ -102,7 +109,7 @@ Ele é automaticamente ignorado quando Docker não está disponível, então a s
 A API usa JWT. Cadastre-se em `POST /api/v1/auth/register` (incluindo `passwordConfirmation`) e entre
 em `POST /api/v1/auth/login`; o cadastro retorna apenas `id`, `name` e `email`, enquanto o login retorna
 `accessToken`, `tokenType` e `expiresIn`. Envie esse token no cabeçalho HTTP Authorization, usando o esquema de autenticação JWT.
-O cadastro cria automaticamente a lista imutável `Favorites`. `GET /api/v1/users/me` retorna somente id, nome e e-mail.
+O cadastro cria automaticamente a lista imutável `Favoritos`. `GET /api/v1/users/me` retorna somente id, nome e e-mail.
 Rotas disponíveis:
 
 | Área | Rotas |

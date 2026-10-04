@@ -110,13 +110,13 @@ public class SharingController {
     }
 
     public record ShareRequest(@NotNull Boolean active) { }
-    public record ShareSettings(boolean active, String url, String token) { }
+    public record ShareSettings(boolean shared, String url, String token) { }
     public record PublicList(String name, long mediaCount, PageResponse<PublicMedia> items) { }
-    public record PublicMedia(String title, String type, Integer releaseYear, String genre, String synopsis,
-                              String coverUrl, java.math.BigDecimal externalRating) {
+    public record PublicMedia(String title, String type, Integer year, String genre, String synopsis,
+                              String coverUrl) {
         static PublicMedia from(MediaEntity media) {
             return new PublicMedia(media.getTitle(), media.getType().name(), media.getReleaseYear(),
-                    media.getGenre(), media.getSynopsis(), media.getCoverUrl(), media.getExternalRating());
+                    media.getGenre(), media.getSynopsis(), media.getCoverUrl());
         }
     }
 }
